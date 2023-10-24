@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Goals Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f0f0f0;
+        }
+        
+        .goal {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin: 0 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            opacity: 0; /* default to hidden */
+            transition: background-color 0.3s, opacity 0.3s;
+        }
+
+        .line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            position: relative;
+        }
+
+        .line:before,
+        .line:after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 2px;
+            height: 40px;
+            background-color: black;
+        }
+
+        .line:before {
+            left: 0;
+        }
+
+        .line:after {
+            right: 0;
+        }
+
+        .btn-group {
+            margin-top: 15px;
+        }
+
+        #scoreboard {
+            margin-top: 15px;
+        }
+
+        #reset {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-5">
+        <div id="game" class="text-center">
+            <div class="row">
+                <div class="col-md-12">
+                    <h1>Team Goals Game</h1>
+                </div>
+            </div>
+    
+            <button class="btn btn-secondary" id="reset">Reset Game</button>
+    
+            <div class="row" id="scoreboard"></div>
+    
+            <div id="teams">
+                <!-- Teams will be added here -->
+            </div>
+        </div>
+    </div>
+    <script>
+        const ws = new WebSocket('ws://localhost:3000');  // Connect to your WebSocket server
+    
+        ws.onopen = () => {
+            console.log('Connected to the server');
+        };
+    
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'updateGameState') {
+                // Update your game state here
+                console.log('Game state updated:', data.gameState);
+            }
+        };
+    
+        ws.onclose = () => {
+            console.log('Disconnected from the server');
+        };
+    
+        ws.onerror = (error) => {
+            console.log('WebSocket error:', error);
+        };
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const teams = ["Red", "Blue", "Green", "Yellow", "Purple"];
+        const totalGoals = 10;
+        const scores = {};
+    
+        document.addEventListener("DOMContentLoaded", function () {
+            const teamsContainer = document.getElementById("teams");
+    
+            teams.forEach(function (team, index) {
+                scores[team] = 0;
+    
+                const teamDiv = document.createElement("div");
+                teamDiv.className = "team mb-4";
+                teamDiv.dataset.id = index; // Set the data-id attribute
+    
+                const teamName = document.createElement("h2");
+                teamName.className = "mb-3";
+                teamName.style.color = team.toLowerCase();
+                teamName.textContent = team;
+    
+                const lineDiv = document.createElement("div");
+                lineDiv.className = "line";
+    
+                for (let i = 0; i < totalGoals; i++) {
+                    const goalDiv = document.createElement("div");
+                    goalDiv.className = "goal";
+                    goalDiv.dataset.team = index;
+                    goalDiv.dataset.goal = i;
+    
+                    lineDiv.appendChild(goalDiv);
+                }
+    
+                const btnGroup = document.createElement("div");
+                btnGroup.className = "btn-group";
+    
+                const completeBtn = document.createElement("button");
+                completeBtn.className = "btn btn-primary";
+                completeBtn.textContent = "Complete Goal";
+                completeBtn.dataset.team = index;
+                completeBtn.onclick = function () {
+                    const teamElement = this.closest('.team');
+                    const teamId = teamElement.dataset.id;
+                    completeGoal(teamId);
+                };
+    
+                btnGroup.appendChild(completeBtn);
+    
+                teamDiv.appendChild(teamName);
+                teamDiv.appendChild(lineDiv);
+                teamDiv.appendChild(btnGroup);
+    
+                teamsContainer.appendChild(teamDiv);
+            });
+    
+            updateScoreboard();
+    
+            const resetBtn = document.getElementById("reset");
+            resetBtn.addEventListener("click", resetGame);
+        });
+    
+        function completeGoal(teamIndex) {
+            const goals = document.querySelectorAll(`.team:nth-child(${parseInt(teamIndex) + 1}) .goal`);
+            let completedGoals = 0;
+    
+            goals.forEach(function (goal) {
+                if (goal.style.opacity === "1") {
+                    completedGoals += 1;
+                }
+            });
+    
+            if (completedGoals < totalGoals) {
+                goals[completedGoals].style.backgroundColor = teams[teamIndex].toLowerCase();
+                goals[completedGoals].style.opacity = 1;
+    
+                if (completedGoals === totalGoals - 1) {
+                    scores[teams[teamIndex]] += 1;
+                    updateScoreboard();
+                    resetRound();
+                    alert(teams[teamIndex] + " has won this round!");
+                }
+            }
+        }
+    
+        function updateScoreboard() {
+            const scoreboard = document.getElementById("scoreboard");
+            scoreboard.innerHTML = '';
+    
+            for (const [team, score] of Object.entries(scores)) {
+                const teamScore = document.createElement("div");
+                teamScore.className = "col";
+                teamScore.textContent = team + ": " + score;
+    
+                scoreboard.appendChild(teamScore);
+            }
+        }
+    
+        function resetRound() {
+            const goals = document.querySelectorAll(`.goal`);
+            goals.forEach(function (goal) {
+                goal.style.opacity = 0;
+            });
+        }
+    
+        function resetGame() {
+            resetRound();
+    
+            for (const team of teams) {
+                scores[team] = 0;
+            }
+    
+            updateScoreboard();
+        }
+    </script>
+    <!-- <script src="/script.js"></script> -->
+    </body>
+    </html
